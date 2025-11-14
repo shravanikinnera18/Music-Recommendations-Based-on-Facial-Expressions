@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Music</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        #controls, #results {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #emotion {
+            font-size: 24px;
+            font-weight: bold;
+            margin-top: 10px;
+            color: #333;
+        }
+        #songs-list {
+            list-style: none;
+            padding: 0;
+            margin-top: 10px;
+            text-align: left;
+        }
+        #songs-list li {
+            margin-bottom: 5px;
+            color: #555;
+        }
+        #error {
+            color: red;
+            margin-top: 10px;
+        }
+        #loading {
+            margin-top: 10px;
+            font-style: italic;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Emotion Based Music Recommender</h1>
+
+    <div id="controls">
+        <button id="scan-button">Scan Emotion & Get Songs</button>
+    </div>
+
+    <div id="results" style="display: none;">
+        <h2>Detected Emotion:</h2>
+        <div id="emotion"></div>
+        <h2>Recommended Songs:</h2>
+        <ul id="songs-list"></ul>
+        <div id="error"></div>
+        <div id="loading">Loading...</div>
+    </div>
+
+    <script>
+        const scanButton = document.getElementById('scan-button');
+        const resultsDiv = document.getElementById('results');
+        const emotionDiv = document.getElementById('emotion');
+        const songsList = document.getElementById('songs-list');
+        const errorDiv = document.getElementById('error');
+        const loadingDiv = document.getElementById('loading');
+
+        scanButton.addEventListener('click', async () => {
+            // --- UI Updates: Show loading, disable button --- 
+            resultsDiv.style.display = 'block';
+            emotionDiv.textContent = '';
+            songsList.innerHTML = ''; // Clear previous songs
+            errorDiv.textContent = ''; // Clear previous errors
+            loadingDiv.style.display = 'block'; // Show loading
+            scanButton.disabled = true;
+            scanButton.textContent = 'Scanning...';
+
+            try {
+                // --- Fetch data from backend --- 
+                // Assuming backend runs on localhost:5001
+                const response = await fetch('/scan-emotion'); // Uses relative path if frontend served by Flask, or use full URL
+
+                if (!response.ok) {
+                    // Handle HTTP errors (e.g., 500 Internal Server Error)
+                    let errorMsg = `Error: ${response.status} ${response.statusText}`;
+                    try {
+                        const errData = await response.json();
+                        errorMsg = errData.error || errData.message || errorMsg;
+                    } catch (e) { /* Ignore if response is not JSON */ }
+                    throw new Error(errorMsg);
+                }
+
+                const data = await response.json();
+
+                // --- Process Response --- 
+                if (data.error) {
+                    // Handle errors reported by the backend API
+                    throw new Error(data.error);
+                } else if (data.message === 'No face detected') {
+                     emotionDiv.textContent = 'No face detected';
+                     songsList.innerHTML = ''; // No songs if no face
+                } else if (data.emotion) {
+                    emotionDiv.textContent = data.emotion;
+                    if (data.songs && data.songs.length > 0) {
+                        data.songs.forEach(song => {
+                            const li = document.createElement('li');
+                            li.textContent = `${song.name} by ${song.artist}`;
+                            songsList.appendChild(li);
+                        });
+                    } else {
+                        songsList.innerHTML = '<li>No song recommendations available.</li>';
+                    }
+                } else {
+                    // Unexpected response formatvenv/
+                     throw new Error('Received unexpected data from server.');
+                }
+
+            } catch (error) {
+                console.error('Scan failed:', error);
+                errorDiv.textContent = `Scan failed: ${error.message}`; 
+                emotionDiv.textContent = '-';
+                songsList.innerHTML = '';
+            } finally {
+                // --- UI Updates: Hide loading, enable button --- 
+                loadingDiv.style.display = 'none'; // Hide loading
+                scanButton.disabled = false;
+                scanButton.textContent = 'Scan Emotion & Get Songs';
+            }
+        });
+    </script>
+
+</body>
+</html>
